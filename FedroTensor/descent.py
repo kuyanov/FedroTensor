@@ -20,7 +20,7 @@ class DescentConfig(object):
                  lr_decay: float = 0.95,
                  plateau_ratio: float = 1e-6,
                  plateau_delay: int = 100,
-                 weight_decay: float = 1e-3,
+                 weight_decay: float = 1e-2,
                  tol: float = 1e-2):
         """
         Args:
@@ -143,8 +143,6 @@ class DescentOptimiser:
         return False
 
     def __round(self, x: torch.Tensor, d: int) -> torch.Tensor:
-        # if torch.is_complex(x):
-        #     return self.__round(torch.real(x), d) + 1j * self.__round(torch.imag(x), d)
         return torch.round(x * d) / d if d != 0 else torch.zeros_like(x)
 
     def get_params(self) -> List[NDArray]:

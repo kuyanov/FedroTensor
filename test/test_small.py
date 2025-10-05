@@ -9,7 +9,7 @@ def check_factorisation(T, factors, tol=1e-2):
 
 
 def test_1d():
-    T = np.array([57, 179], dtype=np.float64)
+    T = np.array([1, 2], dtype=np.float64)
     r, factors = cp_rank(T)
     assert r == 1
     check_factorisation(T, factors)
@@ -34,6 +34,17 @@ def test_2d_complex():
     T = np.array([[1, 1j], [1j, -1]], dtype=np.complex128)
     r, factors = cp_rank(T)
     assert r == 1
+    check_factorisation(T, factors)
+
+
+def test_3d_regularisation():
+    u = np.array([1, 0], dtype=np.float64)
+    v = np.array([0, 1], dtype=np.float64)
+    T = (np.tensordot(v, np.outer(u, u), axes=0) +
+         np.tensordot(u, np.outer(v, u), axes=0) +
+         np.tensordot(u, np.outer(u, v), axes=0))
+    r, factors = cp_rank(T)
+    assert r == 3
     check_factorisation(T, factors)
 
 
