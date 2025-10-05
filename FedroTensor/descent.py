@@ -46,13 +46,25 @@ class DescentOptimiser:
     Class implementing gradient descent for abstract optimisation problems.
     """
 
+    COMPLEX2FLOAT = {torch.complex32: torch.float16,
+                     torch.complex64: torch.float32,
+                     torch.complex128: torch.float64}
+
     def __init__(self,
-                 shapes: Sequence[Tuple],
+                 shapes: List[Tuple],
                  loss: Callable[[Sequence[torch.Tensor]], torch.Tensor],
                  dtype: torch.dtype = torch.float):
+        if dtype in self.COMPLEX2FLOAT.keys():
+            dtype = self.COMPLEX2FLOAT[dtype]
+            shapes = shapes + shapes
+            self.loss = lambda params: loss([params[i] + 1j * params[i + len(params) // 2]
+                                             for i in range(len(params) // 2)])
+            self.is_complex = True
+        else:
+            self.loss = loss
+            self.is_complex = False
         self.params = [torch.randn(shape, dtype=dtype, requires_grad=True) for shape in shapes]
         self.fixed = [torch.full(shape, torch.nan, dtype=dtype) for shape in shapes]
-        self.loss = loss
 
     def __descent(self,
                   config: DescentConfig,
@@ -131,8 +143,8 @@ class DescentOptimiser:
         return False
 
     def __round(self, x: torch.Tensor, d: int) -> torch.Tensor:
-        if torch.is_complex(x):
-            return self.__round(torch.real(x), d) + 1j * self.__round(torch.imag(x), d)
+        # if torch.is_complex(x):
+        #     return self.__round(torch.real(x), d) + 1j * self.__round(torch.imag(x), d)
         return torch.round(x * d) / d if d != 0 else torch.zeros_like(x)
 
     def get_params(self) -> List[NDArray]:
@@ -142,7 +154,11 @@ class DescentOptimiser:
         Returns:
             Sequence of NumPy arrays.
         """
-        return [param.detach().numpy() for param in self.params]
+        if self.is_complex:
+            return [(self.params[i] + 1j * self.params[i + len(self.params) // 2]).detach().numpy()
+                    for i in range(len(self.params) // 2)]
+        else:
+            return [param.detach().numpy() for param in self.params]
 
     def optimise(self,
                  verbose: bool = False,
