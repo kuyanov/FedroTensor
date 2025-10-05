@@ -76,7 +76,7 @@ def cp_rank(A: NDArray,
             symmetric: bool = False,
             rational: bool = False,
             verbose: bool = False,
-            **desc_kwargs) -> Tuple[int, Union[List[NDArray], None]]:
+            **desc_kwargs) -> Tuple[int, List[NDArray]]:
     """
     Computes the CP rank of tensor A and the corresponding rank decomposition.
 
@@ -115,4 +115,6 @@ def cp_rank(A: NDArray,
                                     rational=True,
                                     verbose=verbose,
                                     **desc_kwargs)
+    if factors is None:
+        raise ValueError('Failed to find rank-decomposition, try increasing r_max')
     return rank_r, factors
