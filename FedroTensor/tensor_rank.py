@@ -3,7 +3,7 @@ import torch
 from numpy.typing import NDArray
 from typing import List, Sequence, Tuple, Union
 
-from src.descent import DescentOptimiser
+from .descent import DescentOptimiser
 
 
 def cp_rank_loss(T: torch.Tensor, factors: Sequence[torch.Tensor]) -> torch.Tensor:
@@ -68,7 +68,7 @@ def cp_rank(A: NDArray,
             num_attempts: int = 10,
             rational: bool = False,
             verbose: bool = False,
-            **desc_kwargs) -> Tuple[int, List[NDArray]]:
+            **desc_kwargs) -> Tuple[int, Union[List[NDArray], None]]:
     """
     Computes the CP rank of tensor A and the corresponding rank decomposition.
 

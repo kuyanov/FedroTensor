@@ -59,8 +59,9 @@ class DescentOptimiser:
                   verbose: bool = False) -> bool:
         optimiser = torch.optim.Adam(self.params, lr=config.lr, weight_decay=config.weight_decay)
         scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimiser, factor=config.lr_decay)
-        pbar = tqdm(total=config.num_iter, unit='batches') if verbose else None
-        loss_prev = 1
+        if verbose:
+            pbar = tqdm(total=config.num_iter, unit='batches')
+        loss_prev = torch.Tensor(1)
         plateau_cnt = 0
         for _ in range(config.num_iter):
             loss = self.loss(self.params)
@@ -99,12 +100,14 @@ class DescentOptimiser:
         for param_id in range(len(self.params)):
             deltas = torch.abs(self.params[param_id] - target[param_id])
             deltas[~self.fixed[param_id].isnan() | used[param_id]] = torch.inf
-            delta = torch.min(deltas)
-            ind = torch.argmin(deltas)
+            delta = torch.min(deltas).item()
+            ind = int(torch.argmin(deltas).item())
             if delta < min_delta:
                 min_delta = delta
                 min_ind = ind
                 min_param_id = param_id
+        if min_ind is None or min_param_id is None:
+            raise ValueError('Empty parameters')
         min_indices = np.unravel_index(min_ind, self.params[min_param_id].shape)
         used[min_param_id][min_indices] = True
         cnt_params = sum(np.prod(p.shape) for p in self.params)
