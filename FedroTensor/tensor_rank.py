@@ -1,3 +1,4 @@
+import sys
 import torch
 
 from numpy.typing import NDArray
@@ -11,7 +12,7 @@ def cp_rank_loss(T: torch.Tensor, factors: Sequence[torch.Tensor]) -> torch.Tens
     Loss for the CP rank optimisation.
 
     Args:
-        T: Original tensor.
+        T: Torch tensor.
         factors: Rank decomposition of T.
 
     Returns:
@@ -35,10 +36,10 @@ def cp_rank_factorise(A: NDArray,
                       verbose: bool = False,
                       **desc_kwargs) -> Union[List[NDArray], None]:
     """
-    Checks whether tensor A admits a CP rank decomposition of rank r.
+    Checks whether A admits a CP rank decomposition of rank r.
 
     Args:
-        A: Original tensor.
+        A: NumPy array.
         r: Conjectured CP rank of A.
         num_attempts: Number of optimisation trials.
         symmetric: Compute symmetric rank decomposition (factors are equal).
@@ -47,15 +48,15 @@ def cp_rank_factorise(A: NDArray,
         desc_kwargs: Config parameters for gradient descent.
 
     Returns:
-        The rank decomposition of rank r, if found (None otherwise).
+        Rank decomposition of rank r, if found (None otherwise).
     """
     T = torch.tensor(A)
     if not symmetric:
-        factor_shapes = [(T.shape[i], r) for i in range(A.ndim)]
+        factor_shapes = [(T.shape[i], r) for i in range(T.ndim)]
         loss = lambda fac: cp_rank_loss(T, fac)
     else:
         factor_shapes = [(T.shape[0], r)]
-        loss = lambda fac: cp_rank_loss(T, [fac[0]] * A.ndim)
+        loss = lambda fac: cp_rank_loss(T, [fac[0]] * T.ndim)
     for _ in range(num_attempts):
         optimiser = DescentOptimiser(factor_shapes, loss, dtype=T.dtype)
         success = optimiser.optimise(verbose=verbose, **desc_kwargs)
@@ -66,7 +67,7 @@ def cp_rank_factorise(A: NDArray,
             if not success:
                 raise ValueError('Failed to compute rational factors')
         params = optimiser.get_params()
-        return params if not symmetric else [params[0] for _ in range(A.ndim)]
+        return params if not symmetric else [params[0] for _ in range(T.ndim)]
     return None
 
 
@@ -78,11 +79,11 @@ def cp_rank(A: NDArray,
             verbose: bool = False,
             **desc_kwargs) -> Tuple[int, List[NDArray]]:
     """
-    Computes the CP rank of tensor A and the corresponding rank decomposition.
+    Computes the CP rank of A and the corresponding rank decomposition.
 
     Args:
-        A: Original tensor.
-        r_max: Maximum possible rank of A.
+        A: NumPy array.
+        r_max: Maximum CP rank.
         num_attempts: Number of optimisation trials.
         symmetric: Compute symmetric rank decomposition (factors are equal).
         rational: Compute rational factors.
@@ -97,6 +98,8 @@ def cp_rank(A: NDArray,
     factors = None
     while rank_r - rank_l > 1:
         rank_m = (rank_l + rank_r) // 2
+        if verbose:
+            print(f'interval {rank_l, rank_r}, checking rank {rank_m}', file=sys.stderr)
         cur_factors = cp_rank_factorise(A, rank_m,
                                         num_attempts=num_attempts,
                                         symmetric=symmetric,
@@ -116,5 +119,5 @@ def cp_rank(A: NDArray,
                                     verbose=verbose,
                                     **desc_kwargs)
     if factors is None:
-        raise ValueError('Failed to find rank-decomposition, try increasing r_max')
+        raise ValueError('Failed to find rank decomposition, try increasing r_max')
     return rank_r, factors
