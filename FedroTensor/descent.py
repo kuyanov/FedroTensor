@@ -71,14 +71,13 @@ class DescentOptimiser:
                   verbose: bool = False) -> bool:
         optimiser = torch.optim.Adam(self.params, lr=config.lr, weight_decay=config.weight_decay)
         scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimiser, factor=config.lr_decay)
-        if verbose:
-            pbar = tqdm(total=config.num_iter, unit='batches')
+        pbar = tqdm(total=config.num_iter, unit='batches') if verbose else None
         loss_prev = torch.Tensor(1)
         plateau_cnt = 0
         for _ in range(config.num_iter):
             loss = self.loss(self.params)
             mx = torch.max(torch.abs(torch.cat(list(map(torch.flatten, self.params)))))
-            if verbose:
+            if pbar is not None:
                 pbar.set_postfix(loss=f'{loss.item():.6f}', mx=f'{mx:.2f}')
                 pbar.update()
             if loss.isnan() or loss.isinf():
