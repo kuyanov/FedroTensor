@@ -5,7 +5,7 @@ import torch
 from copy import deepcopy
 from numpy.typing import NDArray
 from tqdm import tqdm
-from typing import Callable, List, Sequence, Tuple
+from typing import Callable, List, Sequence, Tuple, Union
 
 
 class DescentConfig(object):
@@ -53,17 +53,23 @@ class DescentOptimiser:
     def __init__(self,
                  shapes: List[Tuple],
                  loss: Callable[[Sequence[torch.Tensor]], torch.Tensor],
-                 dtype: torch.dtype = torch.float):
+                 dtype: torch.dtype = torch.float,
+                 initial: Union[List[NDArray], None] = None):
         if dtype in self.COMPLEX2FLOAT.keys():
             dtype = self.COMPLEX2FLOAT[dtype]
             shapes = shapes + shapes
             self.loss = lambda params: loss([params[i] + 1j * params[i + len(params) // 2]
                                              for i in range(len(params) // 2)])
+            if initial:
+                initial = [np.real(arr) for arr in initial] + [np.imag(arr) for arr in initial]
             self.is_complex = True
         else:
             self.loss = loss
             self.is_complex = False
-        self.params = [torch.randn(shape, dtype=dtype, requires_grad=True) for shape in shapes]
+        if initial:
+            self.params = [torch.tensor(arr, requires_grad=True) for arr in initial]
+        else:
+            self.params = [torch.randn(shape, dtype=dtype, requires_grad=True) for shape in shapes]
         self.fixed = [torch.full(shape, torch.nan, dtype=dtype) for shape in shapes]
 
     def __descent(self,
@@ -141,7 +147,7 @@ class DescentOptimiser:
             return True
         return False
 
-    def __round(self, x: torch.Tensor, d: int) -> torch.Tensor:
+    def __round(self, x: torch.Tensor, d: float) -> torch.Tensor:
         return torch.round(x * d) / d if d != 0 else torch.zeros_like(x)
 
     def get_params(self) -> List[NDArray]:
@@ -173,7 +179,7 @@ class DescentOptimiser:
         return self.__descent(DescentConfig(**desc_kwargs), verbose=verbose)
 
     def separate(self,
-                 denominators: Sequence[int] = (0, 1, 2, 3, 4, 5, 6, 8, 9, 10),
+                 denominators: Sequence[float] = (0, 1, 2, 3, 4, 5, 6, 8, 9, 10),
                  verbose: bool = False,
                  **desc_kwargs) -> bool:
         """

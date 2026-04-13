@@ -30,9 +30,11 @@ def cp_rank_loss(T: torch.Tensor, factors: Sequence[torch.Tensor]) -> torch.Tens
 
 def cp_rank_factorise(A: NDArray,
                       r: int,
+                      initial: Union[List[NDArray], None] = None,
                       num_attempts: int = 10,
                       symmetric: bool = False,
                       rational: bool = False,
+                      denominators: Sequence[float] = (0, 1, 2, 3, 4, 5, 6, 8, 9, 10),
                       verbose: bool = False,
                       **desc_kwargs) -> Union[List[NDArray], None]:
     """
@@ -41,9 +43,11 @@ def cp_rank_factorise(A: NDArray,
     Args:
         A: NumPy array.
         r: Conjectured CP rank of A.
+        initial: Initial solution.
         num_attempts: Number of optimisation trials.
         symmetric: Compute symmetric rank decomposition (factors are equal).
         rational: Compute rational factors.
+        denominators: Denominators of the nearest rational.
         verbose: Whether to print debug info.
         desc_kwargs: Config parameters for gradient descent.
 
@@ -58,12 +62,12 @@ def cp_rank_factorise(A: NDArray,
         factor_shapes = [(T.shape[0], r)]
         loss = lambda fac: cp_rank_loss(T, [fac[0]] * T.ndim)
     for _ in range(num_attempts):
-        optimiser = DescentOptimiser(factor_shapes, loss, dtype=T.dtype)
+        optimiser = DescentOptimiser(factor_shapes, loss, dtype=T.dtype, initial=initial)
         success = optimiser.optimise(verbose=verbose, **desc_kwargs)
         if not success:
             continue
         if rational:
-            success = optimiser.separate(verbose=verbose, **desc_kwargs)
+            success = optimiser.separate(denominators=denominators, verbose=verbose, **desc_kwargs)
             if not success:
                 raise ValueError('Failed to compute rational factors')
         params = optimiser.get_params()
@@ -113,6 +117,7 @@ def cp_rank(A: NDArray,
             rank_l = rank_m
     if rational:
         factors = cp_rank_factorise(A, rank_r,
+                                    initial=factors,
                                     num_attempts=num_attempts,
                                     symmetric=symmetric,
                                     rational=True,
