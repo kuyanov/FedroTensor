@@ -129,8 +129,9 @@ class DescentOptimiser:
         used[min_param_id][min_indices] = True
         cnt_params = sum(np.prod(p.shape) for p in self.params)
         cnt_fixed = sum((~f.isnan()).sum().item() for f in self.fixed)
+        cnt_used = sum(u.sum() for u in used)
         if verbose:
-            print(f'[{cnt_fixed + 1}/{cnt_params}] separating '
+            print(f'[{cnt_fixed + 1}/{cnt_used - cnt_fixed - 1}/{cnt_params}] separating '
                   f'{self.params[min_param_id][min_indices]} -> {target[min_param_id][min_indices]}',
                   file=sys.stderr)
         params_old = deepcopy(self.params)
