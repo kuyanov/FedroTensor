@@ -36,7 +36,7 @@ def cp_rank_factorise(A: NDArray,
                       complex: bool = False,
                       symmetric: bool = False,
                       rational: bool = False,
-                      denominators: Sequence[float] = (0, 1, 2, 3, 4, 5, 6, 8, 9, 10),
+                      layers: Sequence[Sequence[float]] = DescentOptimiser.rationals(-5, 5, (1, 2, 3, 4, 6, 8)),
                       verbose: bool = False,
                       **desc_kwargs) -> Union[List[NDArray], None]:
     """
@@ -49,8 +49,8 @@ def cp_rank_factorise(A: NDArray,
         num_attempts: Number of optimisation trials.
         complex: Whether rank decomposition is complex-valued.
         symmetric: Compute symmetric rank decomposition (factors are equal).
-        rational: Compute rational factors.
-        denominators: Denominators of the nearest rational.
+        rational: Whether to perform sieving for computing rational factors.
+        layers: Sets of points for sieving.
         verbose: Whether to print debug info.
         desc_kwargs: Config parameters for gradient descent.
 
@@ -73,7 +73,7 @@ def cp_rank_factorise(A: NDArray,
         if not success:
             continue
         if rational:
-            success = optimiser.separate(denominators=denominators, verbose=verbose, **desc_kwargs)
+            success = optimiser.sieve(layers=layers, verbose=verbose, **desc_kwargs)
             if not success:
                 raise ValueError('Failed to compute rational factors')
         return optimiser.get_params()
@@ -86,6 +86,7 @@ def cp_rank(A: NDArray,
             complex: bool = False,
             symmetric: bool = False,
             rational: bool = False,
+            layers: Sequence[Sequence[float]] = DescentOptimiser.rationals(-5, 5, (1, 2, 3, 4, 6, 8)),
             verbose: bool = False,
             **desc_kwargs) -> Tuple[int, List[NDArray]]:
     """
@@ -97,7 +98,8 @@ def cp_rank(A: NDArray,
         num_attempts: Number of optimisation trials.
         complex: Whether rank decomposition is complex-valued.
         symmetric: Compute symmetric rank decomposition (factors are equal).
-        rational: Compute rational factors.
+        rational: Whether to perform sieving for computing rational factors.
+        layers: Sets of points for sieving.
         verbose: Whether to print debug info.
         desc_kwargs: Config parameters for gradient descent.
 
@@ -130,6 +132,7 @@ def cp_rank(A: NDArray,
                                     complex=complex,
                                     symmetric=symmetric,
                                     rational=True,
+                                    layers=layers,
                                     verbose=verbose,
                                     **desc_kwargs)
     if factors is None:

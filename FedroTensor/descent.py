@@ -5,7 +5,7 @@ import torch
 from copy import deepcopy
 from numpy.typing import NDArray
 from tqdm import tqdm
-from typing import Callable, List, Sequence
+from typing import Callable, List, Sequence, Union
 
 
 class DescentConfig(object):
@@ -101,15 +101,18 @@ class DescentOptimiser:
                     p[~f.isnan()] = f[~f.isnan()]
         return False
 
-    def __try_separate(self,
-                       target: Sequence[torch.Tensor],
-                       used: Sequence[torch.Tensor],
-                       config: DescentConfig,
-                       verbose: bool = False) -> bool:
+    def __try_sieve(self,
+                    target: Sequence[torch.Tensor],
+                    used: Sequence[torch.Tensor],
+                    mask: Sequence[bool],
+                    config: DescentConfig,
+                    verbose: bool = False) -> bool:
         min_delta = torch.inf
         min_ind = None
         min_param_id = None
         for param_id in range(len(self.params)):
+            if not mask[param_id]:
+                continue
             deltas = torch.abs(self.params[param_id] - target[param_id])
             deltas[~self.fixed[param_id].isnan() | used[param_id]] = torch.inf
             delta = torch.min(deltas).item()
@@ -122,11 +125,11 @@ class DescentOptimiser:
             raise ValueError('Empty parameters')
         min_indices = np.unravel_index(min_ind, self.params[min_param_id].shape)
         used[min_param_id][min_indices] = True
-        cnt_params = sum(np.prod(p.shape) for p in self.params)
+        cnt_params = sum(np.prod(p.shape) for i, p in enumerate(self.params) if mask[i])
         cnt_fixed = sum((~f.isnan()).sum().item() for f in self.fixed)
         cnt_used = sum(u.sum() for u in used)
         if verbose:
-            print(f'[{cnt_fixed + 1}/{cnt_used - cnt_fixed - 1}/{cnt_params}] separating '
+            print(f'done {cnt_fixed + 1} | skipped {cnt_used - cnt_fixed - 1} | total {cnt_params} | sieving '
                   f'{self.params[min_param_id][min_indices]} -> {target[min_param_id][min_indices]}',
                   file=sys.stderr)
         params_old = deepcopy(self.params)
@@ -142,9 +145,6 @@ class DescentOptimiser:
                     self.fixed[param_id] = fixed_old[param_id]
             return True
         return False
-
-    def __round(self, x: torch.Tensor, d: float) -> torch.Tensor:
-        return torch.round(x * d) / d if d != 0 else torch.zeros_like(x)
 
     def get_params(self) -> List[NDArray]:
         """
@@ -170,28 +170,34 @@ class DescentOptimiser:
         """
         return self.__descent(DescentConfig(**desc_kwargs), verbose=verbose)
 
-    def separate(self,
-                 denominators: Sequence[float] = (0, 1, 2, 3, 4, 5, 6, 8, 9, 10),
-                 verbose: bool = False,
-                 **desc_kwargs) -> bool:
+    @staticmethod
+    def rationals(start: float, stop: float, denominators: Sequence[float]) -> List[List[float]]:
+        return [[0.0]] + [list(map(float, np.arange(start, stop + 1 / (2 * d), 1 / d))) for d in denominators]
+
+    def sieve(self,
+              mask: Union[Sequence[bool], None] = None,
+              layers: Sequence[Sequence[float]] = rationals(-5, 5, (1, 2, 3, 4, 6, 8)),
+              verbose: bool = False,
+              **desc_kwargs) -> bool:
         """
-        Parameter separation by greedy rounding to the nearest rational.
+        Parameter sieving by greedy rounding to the nearest value.
 
         Args:
-            denominators: Denominators of the nearest rational.
+            mask: Which parameters to sieve (default all).
+            layers: Sets of points to round the parameters to.
             verbose: Whether to print debug info.
             desc_kwargs: Config parameters for gradient descent.
 
         Returns:
-            Whether the procedure successfully separated all the parameters.
+            Whether the procedure successfully sieved all the parameters.
         """
+        mask = mask or (True,) * len(self.params)
         config = DescentConfig(**desc_kwargs)
-        for d in denominators:
-            used = [torch.zeros_like(p, dtype=torch.bool) for p in self.params]
-            while any((self.fixed[param_id].isnan() & ~used[param_id]).any()
-                      for param_id in range(len(self.params))):
-                target = [self.__round(p, d) for p in self.params]
-                self.__try_separate(target, used, config, verbose=verbose)
-        if any([f.isnan().any() for f in self.fixed]):
+        for layer in map(torch.tensor, layers):
+            used = [~f.isnan() for f in self.fixed]
+            while any((mask[param_id] & ~used[param_id]).any() for param_id in range(len(self.params))):
+                target = [layer[torch.argmin(torch.abs(p[..., None] - layer), dim=-1)] for p in self.params]
+                self.__try_sieve(target, used, mask, config, verbose=verbose)
+        if any([self.fixed[param_id].isnan().any() for param_id in range(len(self.params)) if mask[param_id]]):
             return False
         return True
