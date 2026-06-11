@@ -76,8 +76,7 @@ def cp_rank_factorise(A: NDArray,
             success = optimiser.separate(denominators=denominators, verbose=verbose, **desc_kwargs)
             if not success:
                 raise ValueError('Failed to compute rational factors')
-        params = optimiser.get_params()
-        return params if not symmetric else [params[0] for _ in range(T.ndim)]
+        return optimiser.get_params()
     return None
 
 

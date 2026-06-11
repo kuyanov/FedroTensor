@@ -24,10 +24,9 @@ def test_2d():
 
 def test_2d_symmetric():
     A = np.array([[1, 2], [2, 4]])
-    r, factors = cp_rank(A, symmetric=True)
+    r, factor = cp_rank(A, symmetric=True)
     assert r == 1
-    assert (factors[0] == factors[1]).all()
-    check_factorisation(A, factors)
+    check_factorisation(A, factor + factor)
 
 
 def test_2d_complex():
