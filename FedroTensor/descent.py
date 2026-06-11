@@ -51,14 +51,18 @@ class DescentOptimiser:
                  loss: Callable[[Sequence[torch.Tensor]], torch.Tensor]):
         self.params = []
         self.params_ext2in: List[List[int]] = [[] for _ in range(len(params))]
+        self.params_in2ext: List[int] = []
         for idx, param in enumerate(params):
             if np.iscomplexobj(param):
                 self.params.append(torch.tensor(np.real(param), requires_grad=True))
                 self.params.append(torch.tensor(np.imag(param), requires_grad=True))
                 self.params_ext2in[idx] = [len(self.params) - 2, len(self.params) - 1]
+                self.params_in2ext.append(idx)
+                self.params_in2ext.append(idx)
             else:
                 self.params.append(torch.tensor(param, requires_grad=True))
                 self.params_ext2in[idx] = [len(self.params) - 1]
+                self.params_in2ext.append(idx)
         self.loss = lambda params_in: loss(self.__convert_params(params_in))
         self.fixed = [torch.full_like(param, torch.nan) for param in self.params]
 
@@ -191,7 +195,10 @@ class DescentOptimiser:
         Returns:
             Whether the procedure successfully sieved all the parameters.
         """
-        mask = mask or (True,) * len(self.params)
+        if mask is not None:
+            mask = [mask[self.params_in2ext[i]] for i in range(len(self.params))]
+        else:
+            mask = [True] * len(self.params)
         config = DescentConfig(**desc_kwargs)
         for layer in map(torch.tensor, layers):
             used = [~f.isnan() for f in self.fixed]
