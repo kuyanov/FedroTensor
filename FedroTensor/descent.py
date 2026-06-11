@@ -5,7 +5,7 @@ import torch
 from copy import deepcopy
 from numpy.typing import NDArray
 from tqdm import tqdm
-from typing import Callable, List, Sequence, Tuple, Union
+from typing import Callable, List, Sequence
 
 
 class DescentConfig(object):
@@ -46,31 +46,26 @@ class DescentOptimiser:
     Class implementing gradient descent for abstract optimisation problems.
     """
 
-    COMPLEX2FLOAT = {torch.complex32: torch.float16,
-                     torch.complex64: torch.float32,
-                     torch.complex128: torch.float64}
-
     def __init__(self,
-                 shapes: List[Tuple],
-                 loss: Callable[[Sequence[torch.Tensor]], torch.Tensor],
-                 dtype: torch.dtype = torch.float,
-                 initial: Union[List[NDArray], None] = None):
-        if dtype in self.COMPLEX2FLOAT.keys():
-            dtype = self.COMPLEX2FLOAT[dtype]
-            shapes = shapes + shapes
-            self.loss = lambda params: loss([params[i] + 1j * params[i + len(params) // 2]
-                                             for i in range(len(params) // 2)])
-            if initial:
-                initial = [np.real(arr) for arr in initial] + [np.imag(arr) for arr in initial]
-            self.is_complex = True
-        else:
-            self.loss = loss
-            self.is_complex = False
-        if initial:
-            self.params = [torch.tensor(arr, requires_grad=True) for arr in initial]
-        else:
-            self.params = [torch.randn(shape, dtype=dtype, requires_grad=True) for shape in shapes]
-        self.fixed = [torch.full(shape, torch.nan, dtype=dtype) for shape in shapes]
+                 params: Sequence[NDArray],
+                 loss: Callable[[Sequence[torch.Tensor]], torch.Tensor]):
+        self.params = []
+        self.params_ext2in: List[List[int]] = [[] for _ in range(len(params))]
+        for idx, param in enumerate(params):
+            if np.iscomplexobj(param):
+                self.params.append(torch.tensor(np.real(param), requires_grad=True))
+                self.params.append(torch.tensor(np.imag(param), requires_grad=True))
+                self.params_ext2in[idx] = [len(self.params) - 2, len(self.params) - 1]
+            else:
+                self.params.append(torch.tensor(param, requires_grad=True))
+                self.params_ext2in[idx] = [len(self.params) - 1]
+        self.loss = lambda params_in: loss(self.__convert_params(params_in))
+        self.fixed = [torch.full_like(param, torch.nan) for param in self.params]
+
+    def __convert_params(self, params: Sequence[torch.Tensor]) -> List[torch.Tensor]:
+        return [params[self.params_ext2in[ext_id][0]] if len(self.params_ext2in[ext_id]) == 1 else
+                params[self.params_ext2in[ext_id][0]] + 1j * params[self.params_ext2in[ext_id][1]]
+                for ext_id in range(len(self.params_ext2in))]
 
     def __descent(self,
                   config: DescentConfig,
@@ -158,11 +153,7 @@ class DescentOptimiser:
         Returns:
             Sequence of NumPy arrays.
         """
-        if self.is_complex:
-            return [(self.params[i] + 1j * self.params[i + len(self.params) // 2]).detach().numpy()
-                    for i in range(len(self.params) // 2)]
-        else:
-            return [param.detach().numpy() for param in self.params]
+        return [param.detach().numpy() for param in self.__convert_params(self.params)]
 
     def optimise(self,
                  verbose: bool = False,

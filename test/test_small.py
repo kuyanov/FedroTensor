@@ -9,21 +9,21 @@ def check_factorisation(A, factors, tol=1e-2):
 
 
 def test_1d():
-    A = np.array([1, 2], dtype=np.float64)
+    A = np.array([1, 2])
     r, factors = cp_rank(A)
     assert r == 1
     check_factorisation(A, factors)
 
 
 def test_2d():
-    A = np.array([[-1, -1], [-1, -1]], dtype=np.float64)
+    A = np.array([[-1, -1], [-1, -1]])
     r, factors = cp_rank(A)
     assert r == 1
     check_factorisation(A, factors)
 
 
 def test_2d_symmetric():
-    A = np.array([[1, 2], [2, 4]], dtype=np.float64)
+    A = np.array([[1, 2], [2, 4]])
     r, factors = cp_rank(A, symmetric=True)
     assert r == 1
     assert (factors[0] == factors[1]).all()
@@ -31,15 +31,15 @@ def test_2d_symmetric():
 
 
 def test_2d_complex():
-    A = np.array([[1, 1j], [1j, -1]], dtype=np.complex128)
-    r, factors = cp_rank(A)
+    A = np.array([[1, 1j], [1j, -1]])
+    r, factors = cp_rank(A, complex=True)
     assert r == 1
     check_factorisation(A, factors)
 
 
 def test_3d_regularisation():
-    u = np.array([1, 0], dtype=np.float64)
-    v = np.array([0, 1], dtype=np.float64)
+    u = np.array([1, 0])
+    v = np.array([0, 1])
     A = (np.tensordot(v, np.outer(u, u), axes=0) +
          np.tensordot(u, np.outer(v, u), axes=0) +
          np.tensordot(u, np.outer(u, v), axes=0))
@@ -49,7 +49,7 @@ def test_3d_regularisation():
 
 
 def test_3d_complex_rational():
-    A = np.array([[[1, 1], [1, -1]], [[1, -1], [-1, -1]]], dtype=np.complex128)
-    r, factors = cp_rank(A, rational=True)
+    A = np.array([[[1, 1], [1, -1]], [[1, -1], [-1, -1]]])
+    r, factors = cp_rank(A, complex=True, rational=True)
     assert r == 2
     check_factorisation(A, factors, tol=1e-9)

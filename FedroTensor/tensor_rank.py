@@ -1,3 +1,4 @@
+import numpy as np
 import sys
 import torch
 
@@ -30,8 +31,9 @@ def cp_rank_loss(T: torch.Tensor, factors: Sequence[torch.Tensor]) -> torch.Tens
 
 def cp_rank_factorise(A: NDArray,
                       r: int,
-                      initial: Union[List[NDArray], None] = None,
+                      initial: Union[Sequence[NDArray], None] = None,
                       num_attempts: int = 10,
+                      complex: bool = False,
                       symmetric: bool = False,
                       rational: bool = False,
                       denominators: Sequence[float] = (0, 1, 2, 3, 4, 5, 6, 8, 9, 10),
@@ -45,6 +47,7 @@ def cp_rank_factorise(A: NDArray,
         r: Conjectured CP rank of A.
         initial: Initial solution.
         num_attempts: Number of optimisation trials.
+        complex: Whether rank decomposition is complex-valued.
         symmetric: Compute symmetric rank decomposition (factors are equal).
         rational: Compute rational factors.
         denominators: Denominators of the nearest rational.
@@ -55,14 +58,17 @@ def cp_rank_factorise(A: NDArray,
         Rank decomposition of rank r, if found (None otherwise).
     """
     T = torch.tensor(A)
-    if not symmetric:
-        factor_shapes = [(T.shape[i], r) for i in range(T.ndim)]
-        loss = lambda fac: cp_rank_loss(T, fac)
-    else:
-        factor_shapes = [(T.shape[0], r)]
-        loss = lambda fac: cp_rank_loss(T, [fac[0]] * T.ndim)
     for _ in range(num_attempts):
-        optimiser = DescentOptimiser(factor_shapes, loss, dtype=T.dtype, initial=initial)
+        if not symmetric:
+            params = initial or [np.random.randn(T.shape[i], r) if not complex else 
+                                 np.random.randn(T.shape[i], r) + 1j * np.random.randn(T.shape[i], r) 
+                                 for i in range(T.ndim)]
+            loss = lambda fac: cp_rank_loss(T, fac)
+        else:
+            params = initial or [np.random.randn(T.shape[0], r) if not complex else
+                                 np.random.randn(T.shape[0], r) + 1j * np.random.randn(T.shape[0], r)]
+            loss = lambda fac: cp_rank_loss(T, [fac[0]] * T.ndim)
+        optimiser = DescentOptimiser(params, loss)
         success = optimiser.optimise(verbose=verbose, **desc_kwargs)
         if not success:
             continue
@@ -78,6 +84,7 @@ def cp_rank_factorise(A: NDArray,
 def cp_rank(A: NDArray,
             r_max: int = 100,
             num_attempts: int = 10,
+            complex: bool = False,
             symmetric: bool = False,
             rational: bool = False,
             verbose: bool = False,
@@ -89,6 +96,7 @@ def cp_rank(A: NDArray,
         A: NumPy array.
         r_max: Maximum CP rank.
         num_attempts: Number of optimisation trials.
+        complex: Whether rank decomposition is complex-valued.
         symmetric: Compute symmetric rank decomposition (factors are equal).
         rational: Compute rational factors.
         verbose: Whether to print debug info.
@@ -106,6 +114,7 @@ def cp_rank(A: NDArray,
             print(f'interval {rank_l, rank_r}, checking rank {rank_m}', file=sys.stderr)
         cur_factors = cp_rank_factorise(A, rank_m,
                                         num_attempts=num_attempts,
+                                        complex=complex,
                                         symmetric=symmetric,
                                         rational=False,
                                         verbose=verbose,
@@ -119,6 +128,7 @@ def cp_rank(A: NDArray,
         factors = cp_rank_factorise(A, rank_r,
                                     initial=factors,
                                     num_attempts=num_attempts,
+                                    complex=complex,
                                     symmetric=symmetric,
                                     rational=True,
                                     verbose=verbose,
