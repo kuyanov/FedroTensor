@@ -130,10 +130,10 @@ class DescentOptimiser:
         min_indices = np.unravel_index(min_ind, self.params[min_param_id].shape)
         used[min_param_id][min_indices] = True
         cnt_params = sum(np.prod(p.shape) for i, p in enumerate(self.params) if mask[i])
-        cnt_fixed = sum((~f.isnan()).sum().item() for f in self.fixed)
-        cnt_used = sum(u.sum() for u in used)
+        cnt_fixed = sum((~f.isnan()).sum().item() for i, f in enumerate(self.fixed) if mask[i])
+        cnt_used = sum(u.sum() for i, u in enumerate(used) if mask[i])
         if verbose:
-            print(f'done {cnt_fixed + 1} | skipped {cnt_used - cnt_fixed - 1} | total {cnt_params} | sieving '
+            print(f'done {cnt_fixed} | skipped {cnt_used - cnt_fixed - 1} | total {cnt_params} | sieving '
                   f'{self.params[min_param_id][min_indices]} -> {target[min_param_id][min_indices]}',
                   file=sys.stderr)
         params_old = deepcopy(self.params)
@@ -202,9 +202,9 @@ class DescentOptimiser:
         config = DescentConfig(**desc_kwargs)
         for layer in map(torch.tensor, layers):
             used = [~f.isnan() for f in self.fixed]
-            while any((mask[param_id] & ~used[param_id]).any() for param_id in range(len(self.params))):
+            while any((mask[i] & ~u).any() for i, u in enumerate(used)):
                 target = [layer[torch.argmin(torch.abs(p[..., None] - layer), dim=-1)] for p in self.params]
                 self.__try_sieve(target, used, mask, config, verbose=verbose)
-        if any([self.fixed[param_id].isnan().any() for param_id in range(len(self.params)) if mask[param_id]]):
+        if any([f.isnan().any() for i, f in enumerate(self.fixed) if mask[i]]):
             return False
         return True
