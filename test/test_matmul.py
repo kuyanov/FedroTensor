@@ -5,7 +5,8 @@ from FedroTensor.matmul_tensor import build_matmul_tensor
 
 
 def check_factorisation(A, factors, tol=1e-2):
-    assert cp_rank_loss(torch.tensor(A), [torch.tensor(factor) for factor in factors]) < tol
+    assert cp_rank_loss(torch.tensor(
+        A), [torch.tensor(factor) for factor in factors]) < tol
 
 
 def test_matmul_2x2x2():

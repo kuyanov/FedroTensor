@@ -54,9 +54,12 @@ class DescentOptimiser:
         self.params_in2ext: List[int] = []
         for idx, param in enumerate(params):
             if np.iscomplexobj(param):
-                self.params.append(torch.tensor(np.real(param), requires_grad=True))
-                self.params.append(torch.tensor(np.imag(param), requires_grad=True))
-                self.params_ext2in[idx] = [len(self.params) - 2, len(self.params) - 1]
+                self.params.append(torch.tensor(
+                    np.real(param), requires_grad=True))
+                self.params.append(torch.tensor(
+                    np.imag(param), requires_grad=True))
+                self.params_ext2in[idx] = [
+                    len(self.params) - 2, len(self.params) - 1]
                 self.params_in2ext.append(idx)
                 self.params_in2ext.append(idx)
             else:
@@ -64,24 +67,29 @@ class DescentOptimiser:
                 self.params_ext2in[idx] = [len(self.params) - 1]
                 self.params_in2ext.append(idx)
         self.loss = lambda params_in: loss(self.__convert_params(params_in))
-        self.fixed = [torch.full_like(param, torch.nan) for param in self.params]
+        self.fixed = [torch.full_like(param, torch.nan)
+                      for param in self.params]
 
     def __convert_params(self, params: Sequence[torch.Tensor]) -> List[torch.Tensor]:
         return [params[self.params_ext2in[ext_id][0]] if len(self.params_ext2in[ext_id]) == 1 else
-                params[self.params_ext2in[ext_id][0]] + 1j * params[self.params_ext2in[ext_id][1]]
+                params[self.params_ext2in[ext_id][0]] + 1j *
+                params[self.params_ext2in[ext_id][1]]
                 for ext_id in range(len(self.params_ext2in))]
 
     def __descent(self,
                   config: DescentConfig,
                   verbose: bool = False) -> bool:
-        optimiser = torch.optim.Adam(self.params, lr=config.lr, weight_decay=config.weight_decay)
-        scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimiser, factor=config.lr_decay)
+        optimiser = torch.optim.Adam(
+            self.params, lr=config.lr, weight_decay=config.weight_decay)
+        scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
+            optimiser, factor=config.lr_decay)
         pbar = tqdm(total=config.num_iter, unit='batches', disable=not verbose)
         loss_prev = torch.Tensor(1)
         plateau_cnt = 0
         for _ in range(config.num_iter):
             loss = self.loss(self.params)
-            mx = torch.max(torch.abs(torch.cat(list(map(torch.flatten, self.params)))))
+            mx = torch.max(
+                torch.abs(torch.cat(list(map(torch.flatten, self.params)))))
             pbar.set_postfix(loss=f'{loss.item():.6f}', mx=f'{mx:.2f}')
             pbar.update()
             if loss.isnan() or loss.isinf():
@@ -126,10 +134,13 @@ class DescentOptimiser:
                 min_param_id = param_id
         if min_ind is None or min_param_id is None:
             raise ValueError('Empty parameters')
-        min_indices = np.unravel_index(min_ind, self.params[min_param_id].shape)
+        min_indices = np.unravel_index(
+            min_ind, self.params[min_param_id].shape)
         used[min_param_id][min_indices] = True
-        cnt_params = sum(np.prod(p.shape) for i, p in enumerate(self.params) if mask[i])
-        cnt_fixed = sum((~f.isnan()).sum().item() for i, f in enumerate(self.fixed) if mask[i])
+        cnt_params = sum(np.prod(p.shape)
+                         for i, p in enumerate(self.params) if mask[i])
+        cnt_fixed = sum((~f.isnan()).sum().item()
+                        for i, f in enumerate(self.fixed) if mask[i])
         cnt_used = sum(u.sum() for i, u in enumerate(used) if mask[i])
         if verbose:
             print(f'done {cnt_fixed} | skipped {cnt_used - cnt_fixed - 1} | total {cnt_params} | sieving '
@@ -179,7 +190,8 @@ class DescentOptimiser:
 
     def sieve(self,
               mask: Union[Sequence[bool], None] = None,
-              layers: Sequence[Sequence[float]] = rationals(-5, 5, (1, 2, 3, 4, 6, 8)),
+              layers: Sequence[Sequence[float]
+                               ] = rationals(-5, 5, (1, 2, 3, 4, 6, 8)),
               verbose: bool = False,
               **desc_kwargs) -> bool:
         """
@@ -195,14 +207,16 @@ class DescentOptimiser:
             Whether the procedure successfully sieved all the parameters.
         """
         if mask is not None:
-            mask = [mask[self.params_in2ext[i]] for i in range(len(self.params))]
+            mask = [mask[self.params_in2ext[i]]
+                    for i in range(len(self.params))]
         else:
             mask = [True] * len(self.params)
         config = DescentConfig(**desc_kwargs)
         for layer in map(torch.tensor, layers):
             used = [~f.isnan() for f in self.fixed]
             while any((mask[i] & ~u).any() for i, u in enumerate(used)):
-                target = [layer[torch.argmin(torch.abs(p[..., None] - layer), dim=-1)] for p in self.params]
+                target = [layer[torch.argmin(
+                    torch.abs(p[..., None] - layer), dim=-1)] for p in self.params]
                 self.__try_sieve(target, used, mask, config, verbose=verbose)
         if any([f.isnan().any() for i, f in enumerate(self.fixed) if mask[i]]):
             return False

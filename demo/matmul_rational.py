@@ -1,7 +1,6 @@
-import sys
 import numpy as np
-
-sys.path.append('..')
+import sys
+sys.path.append('..')  # NOQA
 from FedroTensor.tensor_rank import cp_rank_factorise
 from FedroTensor.matmul_tensor import build_matmul_tensor
 
@@ -11,11 +10,13 @@ if len(sys.argv) != 5:
 n, m, p, r = map(int, sys.argv[1:5])
 T = build_matmul_tensor(n, m, p)
 initial = list(np.load(f'{n}_{m}_{p}_{r}_real.npy', allow_pickle=True))
-initial = [arr.astype('float64') + 1e-5 * np.random.randn(*arr.shape) for arr in initial]
-factors = cp_rank_factorise(T, r, initial=initial, rational=True, 
+initial = [arr.astype('float64') + 1e-5 * np.random.randn(*arr.shape)
+           for arr in initial]
+factors = cp_rank_factorise(T, r, initial=initial, rational=True,
                             lr=1e-2, tol=1e-3, weight_decay=1e-3, num_iter=10000, lr_decay=0.99, verbose=True)
 if factors is not None:
     print(f'FOUND RATIONAL FACTORS n={n} m={m} p={p} r={r}')
-    np.save(f'{n}_{m}_{p}_{r}_rational', np.array(factors, dtype=object), allow_pickle=True)
+    np.save(f'{n}_{m}_{p}_{r}_rational', np.array(
+        factors, dtype=object), allow_pickle=True)
 else:
     print(f'NOT FOUND RATIONAL FACTORS n={n} m={m} p={p} r={r}')

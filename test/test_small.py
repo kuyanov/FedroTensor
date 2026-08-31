@@ -5,7 +5,8 @@ from FedroTensor.tensor_rank import cp_rank, cp_rank_loss
 
 
 def check_factorisation(A, factors, tol=1e-2):
-    assert cp_rank_loss(torch.tensor(A), [torch.tensor(factor) for factor in factors]) < tol
+    assert cp_rank_loss(torch.tensor(
+        A), [torch.tensor(factor) for factor in factors]) < tol
 
 
 def test_1d():
